@@ -1,47 +1,18 @@
-from pathlib import Path
+from fastapi import FastAPI
 
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse
-from pydantic import BaseModel, Field
-
-from app.invoice_service import generate_invoice
-
-
-BASE_DIR = Path(__file__).resolve().parent.parent
-TEMPLATE_PATH = BASE_DIR / "templates" / "invoice_template.xlsx"
-OUTPUT_DIR = BASE_DIR / "output"
-
-app = FastAPI(title="Invoice Excel Service")
+from app.api.errors import register_exception_handlers
+from app.api.routes.health import router as health_router
+from app.api.routes.invoices import router as invoice_router
+from app.core.logging import setup_logging
 
 
-class InvoiceRequest(BaseModel):
-    date: str = Field(description="Дата счета в формате YYYY-MM-DD")
-    invoice_number: int = Field(description="Номер счета")
-    period: str = Field(description="Период отображения в шапке")
-    data: list[list[str]] = Field(description="Строки счета: 6 полей в каждой строке")
+def create_app() -> FastAPI:
+    setup_logging()
+    app = FastAPI(title="Invoice Excel Service", version="1.0.0")
+    app.include_router(health_router, tags=["health"])
+    app.include_router(invoice_router, tags=["invoice"])
+    register_exception_handlers(app)
+    return app
 
 
-@app.get("/health")
-def health() -> dict[str, str]:
-    return {"status": "ok"}
-
-
-@app.post("/invoice")
-def create_invoice(payload: InvoiceRequest) -> FileResponse:
-    try:
-        generated_file = generate_invoice(
-            template_path=TEMPLATE_PATH,
-            output_dir=OUTPUT_DIR,
-            date_iso=payload.date,
-            invoice_number=payload.invoice_number,
-            period=payload.period,
-            data_rows=payload.data,
-        )
-    except Exception as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-    return FileResponse(
-        path=generated_file,
-        filename=generated_file.name,
-        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    )
+app = create_app()

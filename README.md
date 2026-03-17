@@ -1,10 +1,21 @@
 # Web Service Lab
 
-Веб-сервис для тестового задания:
+Production-ready веб-сервис:
 - принимает `POST` с данными счета;
 - подставляет данные в Excel-шаблон;
 - сохраняет копию в `output/`;
-- отдает готовый `.xlsx` файлом в ответе.
+- отдает готовый `.xlsx` файлом в ответе;
+- покрыт тестами и CI-проверками.
+
+## Архитектура
+
+```text
+app/
+  api/         # роуты и обработка ошибок
+  core/        # конфигурация и logging
+  schemas/     # pydantic-схемы запроса
+  services/    # бизнес-логика генерации excel
+```
 
 ## Запуск
 
@@ -13,6 +24,23 @@ python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 uvicorn app.main:app --reload
+```
+
+## Локальная проверка качества
+
+```bash
+pip install -r requirements-dev.txt
+ruff check .
+black --check .
+mypy app tests
+pytest -q
+```
+
+## Pre-commit
+
+```bash
+pre-commit install
+pre-commit run --all-files
 ```
 
 ## Endpoint
@@ -43,3 +71,10 @@ curl -X POST "http://127.0.0.1:8000/invoice" \
 ```
 
 Шаблон используется из `templates/invoice_template.xlsx`.
+
+## Docker
+
+```bash
+docker build -t web-service-lab .
+docker run --rm -p 8000:8000 web-service-lab
+```

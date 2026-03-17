@@ -3,3 +3,6 @@ __pycache__/
 *.pyc
 .venv/
 output/*.xlsx
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
