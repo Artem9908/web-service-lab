@@ -60,6 +60,18 @@ def _rows_to_decimal_total(rows: Iterable[Sequence[str]]) -> Decimal:
     return total
 
 
+def _clear_dynamic_merges(sheet, start_row: int) -> None:
+    # В динамической части шаблона удаляем все merge-диапазоны,
+    # иначе при 10+ строках старые объединения ломают таблицу.
+    ranges_to_remove = []
+    for merged_range in sheet.merged_cells.ranges:
+        _, min_row, _, max_row = merged_range.bounds
+        if max_row >= start_row:
+            ranges_to_remove.append(str(merged_range))
+    for merged in ranges_to_remove:
+        sheet.unmerge_cells(merged)
+
+
 def _reset_total_merges(sheet, total_row: int) -> None:
     # После delete/insert openpyxl может оставить некорректные merged-диапазоны.
     # Явно пересобираем объединения для строк итогов A:F.
@@ -97,6 +109,7 @@ def generate_invoice(
     header_row = _find_row_by_text(ws, HEADER_ORDER_NUMBER)
     detail_start = header_row + 1
     total_row = _find_row_by_text(ws, TOTAL_LABEL)
+    _clear_dynamic_merges(ws, detail_start)
 
     # Сохраняем стиль первой строки таблицы, чтобы применить его к новым строкам.
     style_anchor_row = detail_start
