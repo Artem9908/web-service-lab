@@ -87,6 +87,11 @@ docker compose up --build -d
 - Снаружи используется `HTTP_PORT` из `.env`.
 - По умолчанию: `HTTP_PORT=8080`, значит endpoint доступен на `http://127.0.0.1:8080`.
 
+### Volumes
+
+- `./templates:/app/templates:ro` — шаблоны Excel берутся с хоста (read-only).
+- `./output:/app/output` — результаты генерации сохраняются на хосте.
+
 ### Проверка после запуска
 
 ```bash
