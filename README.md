@@ -75,6 +75,32 @@ curl -X POST "http://127.0.0.1:8000/invoice" \
 ## Docker
 
 ```bash
-docker build -t web-service-lab .
-docker run --rm -p 8000:8000 web-service-lab
+cp .env.example .env
+docker compose up --build -d
 ```
+
+Сервис в `docker-compose.yml` называется `doc-builder`.
+
+### ENV-порты
+
+- Внутри контейнера приложение всегда слушает `80`.
+- Снаружи используется `HTTP_PORT` из `.env`.
+- По умолчанию: `HTTP_PORT=8080`, значит endpoint доступен на `http://127.0.0.1:8080`.
+
+### Проверка после запуска
+
+```bash
+docker compose ps
+curl http://127.0.0.1:${HTTP_PORT}/health
+```
+
+### Проверка генерации файла через Docker
+
+```bash
+curl -X POST "http://127.0.0.1:${HTTP_PORT}/invoice" \
+  -H "Content-Type: application/json" \
+  --data @payload.json \
+  -o generated_from_docker.xlsx
+```
+
+Скопированная сервисом версия файла сохраняется в `output/` (эта папка примонтирована из хоста).
