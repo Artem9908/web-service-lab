@@ -16,7 +16,7 @@ def create_invoice(payload: InvoiceRequest) -> FileResponse:
         date_iso=payload.date.isoformat(),
         invoice_number=payload.invoice_number,
         period=payload.period,
-        data_rows=[row.root for row in payload.data],
+        data_rows=payload.normalized_data_rows(),
     )
     return FileResponse(
         path=generated_file,

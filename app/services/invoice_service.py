@@ -14,6 +14,7 @@ HEADER_ORDER_NUMBER = "№ Заказа"
 TOTAL_LABEL = "ИТОГО, руб. без учета НДС (20%)"
 VAT_LABEL = "НДС (20%)"
 TOTAL_WITH_VAT_LABEL = "ИТОГО, руб. с НДС (20%)"
+PLACEHOLDER_PATTERN = re.compile(r"^\{\{([a-zA-Z0-9_]+)\}\}$")
 
 
 class InvoiceServiceError(ValueError):
@@ -56,6 +57,77 @@ def _replace_text_placeholders(sheet: Worksheet, mapping: dict[str, str]) -> int
                 cell.value = updated
                 replacements += 1
     return replacements
+
+
+def _extract_row_placeholders(
+    sheet: Worksheet, row: int, col_start: int = 1, col_end: int = 7
+) -> dict[int, str]:
+    placeholders: dict[int, str] = {}
+    for col in range(col_start, col_end + 1):
+        cell_value = sheet.cell(row=row, column=col).value
+        if not isinstance(cell_value, str):
+            continue
+        match = PLACEHOLDER_PATTERN.match(cell_value.strip())
+        if match:
+            placeholders[col] = match.group(1)
+    return placeholders
+
+
+def _build_row_context(index: int, item: Sequence[str]) -> dict[str, str | int | float]:
+    order_id = item[0]
+    service_id = item[1]
+    device_name = item[2]
+    period = item[3]
+    sum_value = float(_parse_decimal(item[4]))
+    total_sum_value = float(_parse_decimal(item[5]))
+
+    return {
+        "index": index,
+        "order_id": order_id,
+        "service_id": service_id,
+        "device_name": device_name,
+        "period": period,
+        "sum": sum_value,
+        "total_sum": total_sum_value,
+        # Legacy aliases used in some Excel templates.
+        "data0": order_id,
+        "data1": service_id,
+        "data2": index,
+        "data3": device_name,
+        "data5": period,
+        "data7": sum_value,
+        "data10": total_sum_value,
+    }
+
+
+def _resolve_row_value(
+    col: int,
+    row_placeholders: dict[int, str],
+    row_context: dict[str, str | int | float],
+    item: Sequence[str],
+    index: int,
+) -> str | int | float:
+    if col in row_placeholders:
+        placeholder_key = row_placeholders[col]
+        if placeholder_key not in row_context:
+            raise InvoiceServiceError(f"Неизвестный плейсхолдер в строке данных: {placeholder_key}")
+        return row_context[placeholder_key]
+
+    if col == 1:
+        return index
+    if col == 2:
+        return item[0]
+    if col == 3:
+        return item[1]
+    if col == 4:
+        return item[2]
+    if col == 5:
+        return item[3]
+    if col == 6:
+        return float(_parse_decimal(item[4]))
+    if col == 7:
+        return float(_parse_decimal(item[5]))
+    raise InvoiceServiceError(f"Неподдерживаемая колонка таблицы: {col}")
 
 
 def _find_row_by_text(sheet: Worksheet, text: str, col_start: int = 1, col_end: int = 7) -> int:
@@ -137,6 +209,7 @@ def generate_invoice(
     detail_start = header_row + 1
     total_row = _find_row_by_text(ws, TOTAL_LABEL)
     _clear_dynamic_merges(ws, detail_start)
+    row_placeholders = _extract_row_placeholders(ws, detail_start)
 
     style_anchor_row = detail_start
     style_cache = [copy(ws.cell(style_anchor_row, col)._style) for col in range(1, 8)]
@@ -154,13 +227,15 @@ def generate_invoice(
         if len(item) != 6:
             raise InvoiceServiceError("Каждая строка в data должна содержать 6 элементов")
         row = detail_start + index - 1
-        ws.cell(row=row, column=1).value = index
-        ws.cell(row=row, column=2).value = item[0]
-        ws.cell(row=row, column=3).value = item[1]
-        ws.cell(row=row, column=4).value = item[2]
-        ws.cell(row=row, column=5).value = item[3]
-        ws.cell(row=row, column=6).value = float(_parse_decimal(item[4]))
-        ws.cell(row=row, column=7).value = float(_parse_decimal(item[5]))
+        row_context = _build_row_context(index, item)
+        for col in range(1, 8):
+            ws.cell(row=row, column=col).value = _resolve_row_value(
+                col=col,
+                row_placeholders=row_placeholders,
+                row_context=row_context,
+                item=item,
+                index=index,
+            )
         for col in range(1, 8):
             ws.cell(row=row, column=col)._style = copy(style_cache[col - 1])
 

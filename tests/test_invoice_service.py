@@ -70,3 +70,50 @@ def test_generate_invoice_replaces_template_placeholders(tmp_path: Path) -> None
     assert "Дата счета: 28.02.2026" in str(sheet["G1"].value)
     assert "Номер счета: 1200" in str(sheet["G1"].value)
     assert sheet["G2"].value == "Период: Февраль 2026"
+
+
+def test_generate_invoice_replaces_row_placeholders(tmp_path: Path) -> None:
+    template_copy = tmp_path / "invoice_template_row_placeholders.xlsx"
+    workbook = load_workbook("templates/invoice_template.xlsx")
+    sheet = workbook.active
+    sheet["A7"] = "{{data2}}"
+    sheet["B7"] = "{{data0}}"
+    sheet["C7"] = "{{data1}}"
+    sheet["D7"] = "{{data3}}"
+    sheet["E7"] = "{{data5}}"
+    sheet["F7"] = "{{data7}}"
+    sheet["G7"] = "{{data10}}"
+    workbook.save(template_copy)
+
+    output = generate_invoice(
+        template_path=template_copy,
+        output_dir=tmp_path,
+        date_iso="2026-03-31",
+        invoice_number=1300,
+        period="Март 2026",
+        data_rows=[
+            ["ORD-1", "SRV-1", "DEVICE-1", "01.03.2026 - 31.03.2026", "2500", "1900,50"],
+            ["ORD-2", "SRV-2", "DEVICE-2", "10.03.2026 - 31.03.2026", "3000", "2100,00"],
+        ],
+    )
+
+    result = load_workbook(output)
+    result_sheet = result.active
+    assert [result_sheet.cell(7, col).value for col in range(1, 8)] == [
+        1,
+        "ORD-1",
+        "SRV-1",
+        "DEVICE-1",
+        "01.03.2026 - 31.03.2026",
+        2500,
+        1900.5,
+    ]
+    assert [result_sheet.cell(8, col).value for col in range(1, 8)] == [
+        2,
+        "ORD-2",
+        "SRV-2",
+        "DEVICE-2",
+        "10.03.2026 - 31.03.2026",
+        3000,
+        2100,
+    ]
