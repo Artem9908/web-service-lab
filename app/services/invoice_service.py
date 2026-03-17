@@ -41,6 +41,23 @@ def _replace_header_meta(source: str, date_str: str, invoice_number: int) -> str
     return updated
 
 
+def _replace_text_placeholders(sheet: Worksheet, mapping: dict[str, str]) -> int:
+    replacements = 0
+    for row in range(1, sheet.max_row + 1):
+        for col in range(1, sheet.max_column + 1):
+            cell = sheet.cell(row=row, column=col)
+            if not isinstance(cell.value, str) or "{{" not in cell.value:
+                continue
+            original = cell.value
+            updated = original
+            for key, value in mapping.items():
+                updated = updated.replace(f"{{{{{key}}}}}", value)
+            if updated != original:
+                cell.value = updated
+                replacements += 1
+    return replacements
+
+
 def _find_row_by_text(sheet: Worksheet, text: str, col_start: int = 1, col_end: int = 7) -> int:
     for row in range(1, sheet.max_row + 1):
         for col in range(col_start, col_end + 1):
@@ -102,8 +119,19 @@ def generate_invoice(
     wb = load_workbook(template_path)
     ws = wb.active
 
-    ws["G1"] = _replace_header_meta(str(ws["G1"].value), date_as_str, invoice_number)
-    ws["G2"] = f"Период: {period}"
+    placeholder_replacements = _replace_text_placeholders(
+        ws,
+        {
+            "invoice_date": date_as_str,
+            "invoice_number": str(invoice_number),
+            "period": period,
+        },
+    )
+
+    # Backward compatibility для старых шаблонов без {{placeholders}}.
+    if placeholder_replacements == 0:
+        ws["G1"] = _replace_header_meta(str(ws["G1"].value), date_as_str, invoice_number)
+        ws["G2"] = f"Период: {period}"
 
     header_row = _find_row_by_text(ws, HEADER_ORDER_NUMBER)
     detail_start = header_row + 1

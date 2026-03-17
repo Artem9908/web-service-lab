@@ -71,6 +71,10 @@ curl -X POST "http://127.0.0.1:8000/invoice" \
 ```
 
 Шаблон используется из `templates/invoice_template.xlsx`.
+Для текстовых подстановок в шаблоне поддерживаются плейсхолдеры:
+- `{{invoice_date}}`
+- `{{invoice_number}}`
+- `{{period}}`
 
 ## Docker
 
